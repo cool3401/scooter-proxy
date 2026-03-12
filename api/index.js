@@ -1,36 +1,37 @@
-const https = require('https');
 const axios = require('axios');
+const https = require('https');
 
-export default async function handler(req, res) {
-    const BEGET_FILE_URL = "https://vash-sait.beget.tech/cmd.txt"; // Укажите ваш адрес
-    const TARGET_URL = "https://commandsend.lite.rent/send";
+module.exports = async (req, res) => {
+    // Настройка CORS, чтобы браузер не блокировал запрос (Failed to fetch)
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+
+    // Предварительная проверка браузером (preflight request)
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
+    const agent = new https.Agent({ rejectUnauthorized: false });
 
     try {
-        // 1. Идем на Beget и забираем команду
-        const begetRes = await axios.get(BEGET_FILE_URL);
-        const content = begetRes.data.trim();
-
-        if (!content || content === "") {
-            return res.status(200).send("Очередь пуста");
-        }
-
-        const [imei, command] = content.split("|");
-
-        // 2. Отправляем её на сервер самокатов
-        const agent = new https.Agent({ rejectUnauthorized: false });
         const response = await axios({
             method: 'post',
-            url: TARGET_URL,
-            data: `imeis=${imei}&command=${command}`,
+            url: "https://commandsend.lite.rent/send",
+            data: req.body, // Пробрасываем данные (imeis и command)
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': 'Basic ' + Buffer.from("cmds:9998").toString('base64')
+                'Authorization': 'Basic ' + Buffer.from("cmds:9998").toString('base64'),
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
             },
             httpsAgent: agent
         });
-
-        res.status(200).send("Выполнено: " + response.data);
-    } catch (e) {
-        res.status(500).send("Ошибка: " + e.message);
+        
+        // Возвращаем ответ от сервера самокатов обратно в ваш интерфейс
+        res.status(200).send(response.data);
+    } catch (error) {
+        res.status(200).send(error.response ? error.response.data : error.message);
     }
-}
+};
