@@ -1,53 +1,37 @@
-const https = require('https');
-
-module.exports = (req, res) => {
-    // 1. Заголовки CORS (обязательно в самом начале)
+export default async function handler(req, res) {
+    // 1. Заголовки CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    // 2. Ответ на предварительный запрос браузера
+    // 2. Ответ на проверку браузера
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return res.status(200).end();
     }
 
-    // 3. Тестовый GET запрос (чтобы проверить в браузере)
+    // 3. Тест через браузер
     if (req.method === 'GET') {
-        return res.status(200).send("Vercel Proxy Active! Мост работает.");
+        return res.status(200).send("Vercel Proxy v2: OK. Мост готов!");
     }
 
-    // 4. Логика POST запроса (отправка команд)
-    let body = '';
-    req.on('data', chunk => { body += chunk.toString(); });
-    req.on('end', () => {
-        const options = {
-            hostname: 'commandsend.lite.rent',
-            port: 443,
-            path: '/send',
-            method: 'POST',
+    // 4. Пересылка команды на сервер самокатов
+    try {
+        // Получаем тело запроса (imeis и command)
+        const body = new URLSearchParams(req.body).toString();
+
+        const response = await fetch("https://commandsend.lite.rent/send", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': 'Basic ' + Buffer.from("cmds:9998").toString('base64'),
-                'Content-Length': Buffer.byteLength(body),
-                'User-Agent': 'Mozilla/5.0'
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": "Basic " + Buffer.from("cmds:9998").toString("base64"),
+                "User-Agent": "Mozilla/5.0"
             },
-            rejectUnauthorized: false 
-        };
-
-        const proxyReq = https.request(options, (proxyRes) => {
-            let result = '';
-            proxyRes.on('data', d => { result += d; });
-            proxyRes.on('end', () => {
-                res.status(200).send(result);
-            });
+            body: body
         });
 
-        proxyReq.on('error', e => {
-            res.status(200).send("Ошибка запроса к lite.rent: " + e.message);
-        });
-
-        proxyReq.write(body);
-        proxyReq.end();
-    });
-};
+        const data = await response.text();
+        return res.status(200).send(data);
+    } catch (error) {
+        return res.status(200).send("Ошибка Vercel: " + error.message);
+    }
+}
