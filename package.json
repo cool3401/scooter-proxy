@@ -1,33 +1,5 @@
-const https = require('https');
-
-module.exports = async (req, res) => {
-  const targetUrl = "https://commandsend.lite.rent/send";
-  
-  // Создаем агент, который игнорирует ошибки SSL
-  const agent = new https.Agent({
-    rejectUnauthorized: false
-  });
-
-  try {
-    // Получаем тело запроса от Beget
-    const body = req.body;
-    // Превращаем объект в строку параметров (как x-www-form-urlencoded)
-    const postData = new URLSearchParams(body).toString();
-
-    const response = await fetch(targetUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + Buffer.from("cmds:9998").toString('base64'),
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-      },
-      body: postData,
-      agent: agent // Передаем настройки SSL
-    });
-
-    const data = await response.text();
-    res.status(200).send(data);
-  } catch (error) {
-    res.status(200).send("Ошибка моста: " + error.message);
-  }
-};
+{
+  "name": "scooter-proxy",
+  "version": "1.0.0",
+  "dependencies": {}
+}
