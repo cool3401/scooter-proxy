@@ -1,12 +1,19 @@
 const https = require('https');
 
 module.exports = (req, res) => {
+    // Жестко разрешаем всё для всех
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Max-Age', '86400');
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method === 'GET') return res.status(200).send("Proxy Online");
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    if (req.method === 'GET') {
+        return res.status(200).send("Proxy Online");
+    }
 
     let bodyData = "";
     if (req.body && typeof req.body === 'object') {
@@ -31,10 +38,15 @@ module.exports = (req, res) => {
     const proxyReq = https.request(options, (proxyRes) => {
         let result = '';
         proxyRes.on('data', d => { result += d; });
-        proxyRes.on('end', () => res.status(200).send(result || "ok"));
+        proxyRes.on('end', () => {
+            res.status(200).send(result || "ok");
+        });
     });
 
-    proxyReq.on('error', e => res.status(200).send("Error: " + e.message));
+    proxyReq.on('error', e => {
+        res.status(200).send("Error: " + e.message);
+    });
+
     proxyReq.write(bodyData);
     proxyReq.end();
 };
