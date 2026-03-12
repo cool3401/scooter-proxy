@@ -1,30 +1,36 @@
-const axios = require('axios');
 const https = require('https');
+const axios = require('axios');
 
-module.exports = async (req, res) => {
-  // Игнорируем проблемы с SSL сертификатом (решает ошибку 526)
-  const agent = new https.Agent({
-    rejectUnauthorized: false
-  });
+export default async function handler(req, res) {
+    const BEGET_FILE_URL = "https://vash-sait.beget.tech/cmd.txt"; // Укажите ваш адрес
+    const TARGET_URL = "https://commandsend.lite.rent/send";
 
-  const targetUrl = "https://commandsend.lite.rent/send";
+    try {
+        // 1. Идем на Beget и забираем команду
+        const begetRes = await axios.get(BEGET_FILE_URL);
+        const content = begetRes.data.trim();
 
-  try {
-    const response = await axios({
-      method: 'post',
-      url: targetUrl,
-      data: req.body, 
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + Buffer.from("cmds:9998").toString('base64'),
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-      },
-      httpsAgent: agent
-    });
+        if (!content || content === "") {
+            return res.status(200).send("Очередь пуста");
+        }
 
-    res.status(200).send(response.data);
-  } catch (error) {
-    // Пробрасываем ответ сервера, даже если там ошибка
-    res.status(200).send(error.response ? error.response.data : error.message);
-  }
-};
+        const [imei, command] = content.split("|");
+
+        // 2. Отправляем её на сервер самокатов
+        const agent = new https.Agent({ rejectUnauthorized: false });
+        const response = await axios({
+            method: 'post',
+            url: TARGET_URL,
+            data: `imeis=${imei}&command=${command}`,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + Buffer.from("cmds:9998").toString('base64')
+            },
+            httpsAgent: agent
+        });
+
+        res.status(200).send("Выполнено: " + response.data);
+    } catch (e) {
+        res.status(500).send("Ошибка: " + e.message);
+    }
+}
