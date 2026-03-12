@@ -1,54 +1,53 @@
 const https = require('https');
-const querystring = require('querystring');
 
 module.exports = (req, res) => {
-    // 1. Сразу и безусловно отдаем CORS заголовки
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // 1. Заголовки CORS (обязательно в самом начале)
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    // 2. Отвечаем на проверочный запрос браузера
+    // 2. Ответ на предварительный запрос браузера
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        res.status(200).end();
+        return;
     }
 
-    // 3. Если просто открыть ссылку в браузере - покажем, что прокси жив
+    // 3. Тестовый GET запрос (чтобы проверить в браузере)
     if (req.method === 'GET') {
-        return res.status(200).send("PROXY IS ALIVE! Vercel работает.");
+        return res.status(200).send("Vercel Proxy Active! Мост работает.");
     }
 
-    // 4. Собираем данные для самокатов
-    const postData = querystring.stringify(req.body || {});
+    // 4. Логика POST запроса (отправка команд)
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+        const options = {
+            hostname: 'commandsend.lite.rent',
+            port: 443,
+            path: '/send',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + Buffer.from("cmds:9998").toString('base64'),
+                'Content-Length': Buffer.byteLength(body),
+                'User-Agent': 'Mozilla/5.0'
+            },
+            rejectUnauthorized: false 
+        };
 
-    const options = {
-        hostname: 'commandsend.lite.rent',
-        port: 443,
-        path: '/send',
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Content-Length': Buffer.byteLength(postData),
-            'Authorization': 'Basic ' + Buffer.from("cmds:9998").toString('base64'),
-            'User-Agent': 'Mozilla/5.0'
-        },
-        rejectUnauthorized: false // Игнорируем ошибку 526 SSL
-    };
-
-    // 5. Отправляем запрос
-    const proxyReq = https.request(options, (proxyRes) => {
-        let data = '';
-        proxyRes.on('data', (chunk) => { data += chunk; });
-        proxyRes.on('end', () => {
-            res.status(200).send(data);
+        const proxyReq = https.request(options, (proxyRes) => {
+            let result = '';
+            proxyRes.on('data', d => { result += d; });
+            proxyRes.on('end', () => {
+                res.status(200).send(result);
+            });
         });
-    });
 
-    // 6. Обработка ошибок
-    proxyReq.on('error', (e) => {
-        res.status(200).send("Внутренняя ошибка Vercel: " + e.message);
-    });
+        proxyReq.on('error', e => {
+            res.status(200).send("Ошибка запроса к lite.rent: " + e.message);
+        });
 
-    proxyReq.write(postData);
-    proxyReq.end();
+        proxyReq.write(body);
+        proxyReq.end();
+    });
 };
